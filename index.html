@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Cartographie d'Orchidées</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 500px; margin-bottom: 1em; }
+    .entry-list button { margin-left: 0.5em; }
+  </style>
+</head>
+<body>
+  <h1>Cartographie d'Orchidées</h1>
+  <div id="map"></div>
+  <form id="entry-form">
+    <label>Espèce: <input type="text" id="species" required></label>
+    <label>Date: <input type="date" id="date" required></label>
+    <label>Latitude: <input type="number" id="lat" step="any" required></label>
+    <label>Longitude: <input type="number" id="lng" step="any" required></label>
+    <button type="submit">Ajouter / Mettre à jour</button>
+  </form>
+  <ul id="entries" class="entry-list"></ul>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([46.5, 2], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let entries = JSON.parse(localStorage.getItem('orchidEntries') || '[]');
+    let markers = [];
+
+    function saveEntries() {
+      localStorage.setItem('orchidEntries', JSON.stringify(entries));
+    }
+
+    function addMarker(entry) {
+      const marker = L.circleMarker([entry.lat, entry.lng], {
+        radius: 6,
+        color: '#ff1493',
+        fillColor: '#ff69b4',
+        fillOpacity: 0.8
+      }).addTo(map).bindPopup(`<strong>${entry.species}</strong><br>${entry.date}`);
+      markers.push(marker);
+    }
+
+    function clearMarkers() {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+    }
+
+    function refresh() {
+      clearMarkers();
+      const list = document.getElementById('entries');
+      list.innerHTML = '';
+      entries.forEach((e, i) => {
+        addMarker(e);
+        const li = document.createElement('li');
+        li.textContent = `${e.date} - ${e.species} (${e.lat}, ${e.lng})`;
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Éditer';
+        editBtn.onclick = () => loadEntry(i);
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Supprimer';
+        delBtn.onclick = () => deleteEntry(i);
+        li.appendChild(editBtn);
+        li.appendChild(delBtn);
+        list.appendChild(li);
+      });
+    }
+
+    function loadEntry(idx) {
+      const e = entries[idx];
+      document.getElementById('species').value = e.species;
+      document.getElementById('date').value = e.date;
+      document.getElementById('lat').value = e.lat;
+      document.getElementById('lng').value = e.lng;
+      document.getElementById('entry-form').dataset.editIndex = idx;
+    }
+
+    function deleteEntry(idx) {
+      entries.splice(idx, 1);
+      saveEntries();
+      refresh();
+    }
+
+    document.getElementById('entry-form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      const entry = {
+        species: document.getElementById('species').value,
+        date: document.getElementById('date').value,
+        lat: parseFloat(document.getElementById('lat').value),
+        lng: parseFloat(document.getElementById('lng').value)
+      };
+      const idx = this.dataset.editIndex;
+      if (idx !== undefined && idx !== '') {
+        entries[idx] = entry;
+        this.dataset.editIndex = '';
+      } else {
+        entries.push(entry);
+      }
+      saveEntries();
+      this.reset();
+      refresh();
+    });
+
+    map.on('click', (e) => {
+      document.getElementById('lat').value = e.latlng.lat.toFixed(6);
+      document.getElementById('lng').value = e.latlng.lng.toFixed(6);
+    });
+
+    refresh();
+  </script>
+</body>
+</html>
